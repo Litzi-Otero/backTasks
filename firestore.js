@@ -5,7 +5,7 @@ const admin = require("firebase-admin");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
-const serviceAccount = require("../serviceAccountKey.json");
+const serviceAccount = JSON.parse(process.env.SERVICE_ACCOUNT_KEY);
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
@@ -270,7 +270,7 @@ app.get("/api/user/group", async (req, res) => {
 
 app.post("/api/record/user/task", async (req, res) => {
   try {
-    console.log("Solicitud recibida para asignar tarea:", req.body);
+    //console.log("Solicitud recibida para asignar tarea:", req.body);
 
     const token = req.headers.authorization?.split(' ')[1];
     if (!token) {
@@ -279,7 +279,7 @@ app.post("/api/record/user/task", async (req, res) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log("Usuario autenticado:", decoded.email);
+    //console.log("Usuario autenticado:", decoded.email);
 
     const { name_task, description, dead_line, status, category, email, groupName } = req.body;
     if (!name_task || !email || !groupName) {
@@ -299,12 +299,12 @@ app.post("/api/record/user/task", async (req, res) => {
       created_at: new Date(),
     };
 
-    console.log("Insertando tarea en la base de datos:", newTask);
+    //console.log("Insertando tarea en la base de datos:", newTask);
 
     const taskRef = await db.collection("task").add(newTask);
     const task = await taskRef.get();
 
-    console.log("Tarea creada con ID:", task.id);
+    //console.log("Tarea creada con ID:", task.id);
 
     res.status(201).json({ id: task.id, ...task.data() });
   } catch (error) {
@@ -512,17 +512,49 @@ app.get("/api/groups/:groupName/tasks", async (req, res) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log("Usuario autenticado:", decoded.email);
+    //console.log("Usuario autenticado:", decoded.email);
 
     const { groupName } = req.params;
+    //console.log("Fetching tasks for group:", groupName);
 
     const tasksSnapshot = await db.collection("task").where("group", "==", groupName).get();
     const tasks = tasksSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+    //console.log("Tasks fetched:", tasks);
 
     res.status(200).json(tasks);
   } catch (error) {
     console.error("Error al obtener las tareas del grupo:", error.message);
     res.status(500).json({ message: "Error interno del servidor" });
+  }
+});
+
+app.put('/api/edit/users/:email', async (req, res) => {
+  const { email } = req.params;
+  const { username, rol } = req.body;
+
+  try {
+    const userRef = db.collection('users').where('email', '==', email);
+    const snapshot = await userRef.get();
+
+    if (snapshot.empty) {
+      return res.status(404).json({ message: 'Usuario no encontrado' });
+    }
+
+    let updatedUser;
+    snapshot.forEach(async (doc) => {
+      await doc.ref.update({
+        username,
+        rol,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      updatedUser = { id: doc.id, ...doc.data(), username, rol };
+    });
+
+    res.json(updatedUser);
+  } catch (error) {
+    console.error('Error al actualizar el usuario:', error);
+    res.status(500).json({ message: 'Error al actualizar el usuario' });
   }
 });
 
