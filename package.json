@@ -1,7 +1,7 @@
 {
   "scripts": {
-    "start": "node index.js",
-    "dev": "nodemon index.js"
+    "start": "node firestore.js",
+    "dev": "nodemon firestore.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.1",
